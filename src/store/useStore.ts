@@ -21,6 +21,46 @@ function saveSetting(key: string, value: string) {
   }
 }
 
+// ─── 用户数据持久化 ───
+function loadUser(): User | null {
+  try {
+    const userData = localStorage.getItem('pm_user');
+    return userData ? JSON.parse(userData) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveUser(user: User | null) {
+  try {
+    if (user) {
+      localStorage.setItem('pm_user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('pm_user');
+    }
+  } catch {
+    // localStorage unavailable
+  }
+}
+
+// ─── 项目数据持久化 ───
+function loadProjects(): Project[] {
+  try {
+    const projectsData = localStorage.getItem('pm_projects');
+    return projectsData ? JSON.parse(projectsData) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveProjects(projects: Project[]) {
+  try {
+    localStorage.setItem('pm_projects', JSON.stringify(projects));
+  } catch {
+    // localStorage unavailable
+  }
+}
+
 interface AppState {
   user: User | null;
   projects: Project[];
@@ -65,14 +105,15 @@ interface AppState {
 
   addProject: (p: Project) => void;
   toggleFavorite: (id: string) => void;
+  setProjects: (projects: Project[]) => void;
 }
 
 const DEFAULT_ENDPOINT = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
 const DEFAULT_MODEL = 'qwen-vl-max';
 
 export const useStore = create<AppState>((set) => ({
-  user: null,
-  projects: [],
+  user: loadUser(),
+  projects: loadProjects(),
   currentProject: null,
 
   prompt: '',
@@ -94,7 +135,10 @@ export const useStore = create<AppState>((set) => ({
   apiEndpoint: loadSetting('pm_api_endpoint', DEFAULT_ENDPOINT),
   modelName: loadSetting('pm_model_name', DEFAULT_MODEL),
 
-  setUser: (user) => set({ user }),
+  setUser: (user) => {
+    saveUser(user);
+    set({ user });
+  },
   setPrompt: (prompt) => set({ prompt }),
   setFramework: (framework) => set({ framework }),
   setImageUrl: (imageUrl) => set({ imageUrl }),
@@ -121,13 +165,25 @@ export const useStore = create<AppState>((set) => ({
     set({ modelName });
   },
 
-  addProject: (p) => set((s) => ({ projects: [p, ...s.projects], currentProject: p })),
+  addProject: (p) => set((s) => {
+    const newProjects = [p, ...s.projects];
+    saveProjects(newProjects);
+    return { projects: newProjects, currentProject: p };
+  }),
   toggleFavorite: (id) =>
-    set((s) => ({
-      projects: s.projects.map((p) => (p.id === id ? { ...p, isFavorite: !p.isFavorite } : p)),
-      currentProject:
-        s.currentProject?.id === id
-          ? { ...s.currentProject, isFavorite: !s.currentProject.isFavorite }
-          : s.currentProject,
-    })),
+    set((s) => {
+      const newProjects = s.projects.map((p) => (p.id === id ? { ...p, isFavorite: !p.isFavorite } : p));
+      saveProjects(newProjects);
+      return {
+        projects: newProjects,
+        currentProject:
+          s.currentProject?.id === id
+            ? { ...s.currentProject, isFavorite: !s.currentProject.isFavorite }
+            : s.currentProject,
+      };
+    }),
+  setProjects: (projects) => {
+    saveProjects(projects);
+    set({ projects });
+  },
 }));

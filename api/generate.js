@@ -5,8 +5,9 @@
 // ═══════════════════════════════════════════════════════════════
 
 export const config = {
-  // 使用 Edge Runtime 以支持流式响应
-  runtime: 'edge',
+  // 使用 Node.js Runtime 以支持更长的超时时间
+  runtime: 'nodejs',
+  maxDuration: 60,
 };
 
 const DASHSCOPE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
@@ -49,6 +50,10 @@ export default async function handler(req) {
       );
     }
 
+    // 设置超时控制器
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45秒超时
+
     // ── 转发请求到 DashScope ──
     const response = await fetch(DASHSCOPE_URL, {
       method: 'POST',
@@ -57,7 +62,10 @@ export default async function handler(req) {
         'Authorization': apiKey,
       },
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
 
     // ── 流式转发 ──
     if (body.stream) {
@@ -83,10 +91,25 @@ export default async function handler(req) {
     });
 
   } catch (error) {
+    console.error('API Error:', error);
+
+    let errorMessage = '代理服务器错误';
+    let statusCode = 500;
+
+    if (error.name === 'AbortError') {
+      errorMessage = '请求超时，请稍后重试';
+      statusCode = 504;
+    } else if (error.message.includes('connect')) {
+      errorMessage = '无法连接到 AI 服务，请检查网络连接';
+      statusCode = 503;
+    } else {
+      errorMessage = `代理服务器错误: ${error.message}`;
+    }
+
     return new Response(
-      JSON.stringify({ error: { message: `代理服务器错误: ${error.message}` } }),
+      JSON.stringify({ error: { message: errorMessage } }),
       {
-        status: 500,
+        status: statusCode,
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',

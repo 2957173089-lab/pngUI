@@ -339,7 +339,83 @@ npm run build:h5
 
 ---
 
-## 7. 常见问题 FAQ
+## 7. 超时问题解决方案
+
+### FUNCTION_INVOCATION_TIMEOUT 错误
+
+**问题描述**：部署后运行时出现 `FUNCTION_INVOCATION_TIMEOUT` 错误，特别是在 Vercel 上。
+
+**根本原因**：
+1. Vercel Edge Functions 默认 30 秒超时限制
+2. Qwen-VL 模型生成复杂 UI 代码通常需要 30-60 秒
+3. 网络延迟和 API 响应时间叠加
+
+**解决方案**：
+
+#### 1. 已应用的修复措施
+
+项目已更新以下配置来解决超时问题：
+
+**vercel.json** (新增文件)
+```json
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/generate.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "functions": {
+    "api/generate.js": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  }
+}
+```
+
+**api/generate.js 更新**：
+- 从 `Edge Runtime` 切换到 `Node.js Runtime`
+- 设置 60 秒最大执行时间
+- 增加 45 秒 API 请求超时控制
+- 优化错误处理和超时提示
+
+**前端超时处理**：
+- 增加 50 秒前端请求超时
+- 完善的超时错误提示
+- 流式响应中断处理
+
+#### 2. 部署后验证
+
+1. **重新部署**：在 Vercel 仪表板点击 Redeploy
+2. **测试连接**：在应用设置中点击 "Test Connection"
+3. **性能测试**：上传图片生成 UI，观察是否仍然超时
+
+#### 3. 如果仍然超时
+
+**优化建议**：
+- **简化提示词**：使用更简洁明确的需求描述
+- **减小图片尺寸**：上传 1024x1024 以下的图片
+- **选择更快模型**：使用 `qwen-vl-plus` 替代 `qwen-vl-max`
+- **分步生成**：先生成基础框架，再逐步完善
+
+**高级配置**：
+```json
+// vercel.json - 进一步增加超时限制
+{
+  "functions": {
+    "api/generate.js": {
+      "memory": 2048,
+      "maxDuration": 90
+    }
+  }
+}
+```
+
+> ⚠️ Vercel Pro 账户支持最长 90 秒超时，Hobby 账户最长 60 秒
+
+## 8. 常见问题 FAQ
 
 ### Q1：测试连接时报 "Failed to fetch"？
 

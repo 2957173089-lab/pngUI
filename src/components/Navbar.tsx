@@ -1,13 +1,99 @@
-import { History, Star, LogOut, Sparkles, Settings, Zap } from 'lucide-react';
+import { History, Star, LogOut, Sparkles, Settings, Zap, Cloud, CloudUpload, CloudDownload, Download, Upload } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { exportUserData, importUserData, syncToCloud, syncFromCloud, mergeSyncData, getSyncStatus } from '../utils/sync';
+import { useState, useEffect } from 'react';
 
 export default function Navbar() {
   const user = useStore((s) => s.user);
+  const projects = useStore((s) => s.projects);
   const apiKey = useStore((s) => s.apiKey);
   const setUser = useStore((s) => s.setUser);
+  const setProjects = useStore((s) => s.setProjects);
   const setShowHistory = useStore((s) => s.setShowHistory);
   const setHistoryTab = useStore((s) => s.setHistoryTab);
   const setShowSettings = useStore((s) => s.setShowSettings);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [showSyncMenu, setShowSyncMenu] = useState(false);
+
+  // 点击外部关闭菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showSyncMenu && !(event.target as Element).closest('.relative')) {
+        setShowSyncMenu(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [showSyncMenu]);
+
+  // 同步功能处理函数
+  const handleExportData = () => {
+    exportUserData(projects, user);
+    setShowSyncMenu(false);
+  };
+
+  const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setSyncLoading(true);
+    importUserData(file)
+      .then((data) => {
+        if (data.projects.length > 0) {
+          const mergedProjects = mergeSyncData(projects, data);
+          setProjects(mergedProjects);
+          alert(`成功导入 ${data.projects.length} 个项目`);
+        }
+      })
+      .catch((error) => {
+        alert('导入失败: ' + error.message);
+      })
+      .finally(() => {
+        setSyncLoading(false);
+        setShowSyncMenu(false);
+      });
+
+    // 重置文件输入
+    event.target.value = '';
+  };
+
+  const handleSyncToCloud = () => {
+    setSyncLoading(true);
+    try {
+      syncToCloud(projects, user);
+      setTimeout(() => {
+        setSyncLoading(false);
+        setShowSyncMenu(false);
+        alert('数据已同步到云端');
+      }, 1000);
+    } catch (error) {
+      setSyncLoading(false);
+      alert('同步失败');
+    }
+  };
+
+  const handleSyncFromCloud = () => {
+    setSyncLoading(true);
+    try {
+      const cloudData = syncFromCloud();
+      if (cloudData && cloudData.projects.length > 0) {
+        const mergedProjects = mergeSyncData(projects, cloudData);
+        setProjects(mergedProjects);
+        setTimeout(() => {
+          setSyncLoading(false);
+          setShowSyncMenu(false);
+          alert(`从云端恢复了 ${cloudData.projects.length} 个项目`);
+        }, 1000);
+      } else {
+        setSyncLoading(false);
+        alert('云端没有可恢复的数据');
+      }
+    } catch (error) {
+      setSyncLoading(false);
+      alert('云端同步失败');
+    }
+  };
 
   const isConnected = apiKey.trim().length > 0;
 
@@ -67,6 +153,66 @@ export default function Navbar() {
         </div>
 
         <div className="w-px h-6 bg-blue-200/40 mx-0.5" />
+
+        {/* 同步按钮 */}
+        <div className="relative">
+          <button
+            onClick={() => setShowSyncMenu(!showSyncMenu)}
+            disabled={syncLoading}
+            className="glass-btn"
+            title="数据同步"
+          >
+            {syncLoading ? (
+              <div className="w-4 h-4 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+            ) : (
+              <Cloud className="w-4 h-4" />
+            )}
+            <span className="hidden sm:inline">同步</span>
+          </button>
+
+          {/* 同步菜单 */}
+          {showSyncMenu && (
+            <div className="absolute right-0 top-full mt-2 w-48 bg-white/95 backdrop-blur-xl rounded-xl border border-white/50 shadow-xl z-50">
+              <div className="p-2">
+                <button
+                  onClick={handleSyncToCloud}
+                  disabled={syncLoading}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-blue-50/60 rounded-lg transition"
+                >
+                  <CloudUpload className="w-4 h-4" />
+                  上传到云端
+                </button>
+                <button
+                  onClick={handleSyncFromCloud}
+                  disabled={syncLoading}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-blue-50/60 rounded-lg transition"
+                >
+                  <CloudDownload className="w-4 h-4" />
+                  从云端恢复
+                </button>
+                <div className="border-t border-slate-200/50 my-1" />
+                <button
+                  onClick={handleExportData}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-blue-50/60 rounded-lg transition"
+                >
+                  <Download className="w-4 h-4" />
+                  导出数据
+                </button>
+                <label className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-blue-50/60 rounded-lg transition cursor-pointer">
+                  <Upload className="w-4 h-4" />
+                  导入数据
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleImportData}
+                    className="hidden"
+                    disabled={syncLoading}
+                  />
+                </label>
+              </div>
+            </div>
+          )}
+        </div>
 
         <button
           onClick={() => {

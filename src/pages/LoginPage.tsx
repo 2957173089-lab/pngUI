@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Sparkles, Eye, EyeOff, ArrowRight, Loader2, Zap, Shield, Code2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Sparkles, Eye, EyeOff, ArrowRight, Loader2, Zap, Shield, Code2, UserPlus, LogIn } from 'lucide-react';
 import { useStore } from '../store/useStore';
 
 export default function LoginPage() {
@@ -9,20 +9,73 @@ export default function LoginPage() {
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
-  const handleLogin = async () => {
+  const handleAuth = async () => {
     if (!username.trim()) { setError('请输入用户名'); return; }
     if (!password.trim()) { setError('请输入密码'); return; }
+
+    if (isRegisterMode) {
+      if (password !== confirmPassword) {
+        setError('两次输入的密码不一致');
+        return;
+      }
+      if (password.length < 6) {
+        setError('密码长度至少6位');
+        return;
+      }
+    }
+
     setError('');
     setLoading(true);
+
+    // 模拟网络延迟
     await new Promise((r) => setTimeout(r, 1200));
-    setUser({
+
+    // 保存用户信息到本地存储
+    const userData = {
       id: 'user-' + Date.now(),
       username: username.trim(),
-      avatar: '',
-    });
+      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username.trim()}`,
+    };
+
+    setUser(userData);
     setLoading(false);
+
+    // 保存用户凭据到本地存储（用于自动登录）
+    localStorage.setItem('pm_user_credentials', JSON.stringify({
+      username: username.trim(),
+      password: password // 注意：实际项目中应该加密存储
+    }));
   };
+
+  // 自动登录检查
+  useEffect(() => {
+    const checkAutoLogin = () => {
+      try {
+        const savedCredentials = localStorage.getItem('pm_user_credentials');
+        const savedUser = localStorage.getItem('pm_user');
+
+        if (savedCredentials && savedUser) {
+          const credentials = JSON.parse(savedCredentials);
+          const user = JSON.parse(savedUser);
+
+          // 如果保存的用户名和凭据匹配，自动登录
+          if (credentials.username === user.username) {
+            setUser(user);
+          }
+        }
+      } catch (error) {
+        console.error('自动登录失败:', error);
+      } finally {
+        setIsInitialLoading(false);
+      }
+    };
+
+    checkAutoLogin();
+  }, [setUser]);
 
   const features = [
     { icon: <Zap className="w-5 h-5" />, title: '智能识图', desc: '上传参考图，AI 秒懂你的设计意图' },
@@ -83,18 +136,29 @@ export default function LoginPage() {
         {/* Right: Login Card */}
         <div className="flex-1 flex items-center justify-center">
           <div className="w-full max-w-[400px] p-8 glass-card-strong">
-            <div className="text-center mb-8">
-              <div className="lg:hidden inline-flex items-center gap-2 mb-4">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
-                  PixelMuse AI
-                </span>
+            {isInitialLoading ? (
+              <div className="text-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
+                <p className="text-slate-600">正在检查登录状态...</p>
               </div>
-              <h2 className="text-2xl font-bold text-slate-800 mb-1.5">欢迎回来 👋</h2>
-              <p className="text-sm text-slate-400">登录以开始你的创作旅程</p>
-            </div>
+            ) : (
+              <>
+                <div className="text-center mb-8">
+                  <div className="lg:hidden inline-flex items-center gap-2 mb-4">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                      <Sparkles className="w-5 h-5 text-white" />
+                    </div>
+                    <span className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">
+                      PixelMuse AI
+                    </span>
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-800 mb-1.5">
+                    {isRegisterMode ? '创建账户 🚀' : '欢迎回来 👋'}
+                  </h2>
+                  <p className="text-sm text-slate-400">
+                    {isRegisterMode ? '注册以开始你的创作之旅' : '登录以继续你的创作'}
+                  </p>
+                </div>
 
             <div className="space-y-4">
               <div>
@@ -116,7 +180,7 @@ export default function LoginPage() {
                     type={showPwd ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                    onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
                     placeholder="输入密码"
                     className="glass-input w-full pr-10"
                   />
@@ -130,6 +194,20 @@ export default function LoginPage() {
                 </div>
               </div>
 
+              {isRegisterMode && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-600 mb-1.5">确认密码</label>
+                  <input
+                    type={showPwd ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => { setConfirmPassword(e.target.value); setError(''); }}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
+                    placeholder="再次输入密码"
+                    className="glass-input w-full"
+                  />
+                </div>
+              )}
+
               {error && (
                 <div className="text-sm text-red-500 bg-red-50/60 border border-red-200/40 px-3 py-2 rounded-xl">
                   {error}
@@ -137,27 +215,61 @@ export default function LoginPage() {
               )}
 
               <button
-                onClick={handleLogin}
+                onClick={handleAuth}
                 disabled={loading}
                 className="btn-primary w-full flex items-center justify-center gap-2 mt-2"
               >
                 {loading ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    登录中...
+                    {isRegisterMode ? '注册中...' : '登录中...'}
                   </>
                 ) : (
                   <>
-                    进入工作台
-                    <ArrowRight className="w-4 h-4" />
+                    {isRegisterMode ? (
+                      <>
+                        <UserPlus className="w-4 h-4" />
+                        注册账户
+                      </>
+                    ) : (
+                      <>
+                        <LogIn className="w-4 h-4" />
+                        登录
+                      </>
+                    )}
                   </>
                 )}
               </button>
 
-              <p className="text-center text-xs text-slate-400 mt-4">
-                演示版本 · 输入任意用户名和密码即可登录
+              <div className="flex items-center justify-center gap-4 mt-4">
+                <button
+                  onClick={() => {
+                    setIsRegisterMode(false);
+                    setError('');
+                    setConfirmPassword('');
+                  }}
+                  className={`text-xs transition ${!isRegisterMode ? 'text-blue-600 font-medium' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  登录
+                </button>
+                <span className="text-slate-300">|</span>
+                <button
+                  onClick={() => {
+                    setIsRegisterMode(true);
+                    setError('');
+                    setConfirmPassword('');
+                  }}
+                  className={`text-xs transition ${isRegisterMode ? 'text-blue-600 font-medium' : 'text-slate-400 hover:text-slate-600'}`}
+                >
+                  注册
+                </button>
+              </div>
+
+              <p className="text-center text-xs text-slate-400 mt-2">
+                演示版本 · 数据本地存储，支持自动同步
               </p>
-            </div>
+            </>
+          )}
           </div>
         </div>
       </div>

@@ -87,6 +87,7 @@ export async function generateCodeReal(
   modelName: string,
   onProgress?: (text: string) => void
 ): Promise<string> {
+  try {
   const userContent = buildUserMessage(prompt, framework, imageUrl);
 
   const requestBody = {
@@ -101,6 +102,9 @@ export async function generateCodeReal(
     top_p: 0.9,
   };
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 50000); // 50秒超时
+
   const response = await fetch(apiEndpoint, {
     method: 'POST',
     headers: {
@@ -108,7 +112,10 @@ export async function generateCodeReal(
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(requestBody),
+    signal: controller.signal,
   });
+
+  clearTimeout(timeoutId);
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => 'Unknown error');
@@ -163,6 +170,12 @@ export async function generateCodeReal(
   }
 
   return extractHTML(accumulated);
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      throw new Error('请求超时，请稍后重试');
+    }
+    throw error;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
