@@ -1,8 +1,8 @@
 import { useRef, useState, useCallback } from 'react';
-import { Upload, X, ImagePlus, Wand2, Loader2, Sparkles } from 'lucide-react';
+import { Upload, X, ImagePlus, Wand2, Loader2, Sparkles, AlertCircle, Settings } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { frameworkLabels, frameworkIcons, type Framework, type Project } from '../types';
-import { generateCode } from '../utils/mockAI';
+import { generateCode } from '../utils/api';
 
 const frameworks: Framework[] = ['html', 'vue3', 'react', 'uniapp'];
 
@@ -15,10 +15,13 @@ export default function InputPanel() {
     setStreamingCode,
     addProject,
     setTabMode,
+    apiKey, apiEndpoint, modelName,
+    setShowSettings,
   } = useStore();
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [error, setError] = useState('');
 
   const handleFile = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) return;
@@ -44,10 +47,19 @@ export default function InputPanel() {
     setIsGenerating(true);
     setStreamingCode('');
     setTabMode('preview');
+    setError('');
 
     try {
-      const code = await generateCode(prompt, framework, imageUrl || undefined, (partial) => {
-        setStreamingCode(partial);
+      const code = await generateCode({
+        prompt,
+        framework,
+        imageUrl: imageUrl || undefined,
+        apiKey,
+        apiEndpoint,
+        modelName,
+        onProgress: (partial) => {
+          setStreamingCode(partial);
+        },
       });
 
       const project: Project = {
@@ -61,10 +73,16 @@ export default function InputPanel() {
         createTime: Date.now(),
       };
       addProject(project);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '生成失败，请重试';
+      setError(msg);
+      console.error('Generate error:', err);
     } finally {
       setIsGenerating(false);
     }
   };
+
+  const isConnected = apiKey.trim().length > 0;
 
   return (
     <aside className="w-[360px] min-w-[360px] h-full flex flex-col relative z-10">
@@ -167,6 +185,17 @@ export default function InputPanel() {
             ))}
           </div>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="flex items-start gap-2 p-3 rounded-xl bg-red-50/70 border border-red-200/50 text-xs text-red-600">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold mb-0.5">生成失败</p>
+              <p className="text-red-500 leading-relaxed">{error}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Generate Button */}
@@ -193,6 +222,21 @@ export default function InputPanel() {
             <div className="h-full bg-gradient-to-r from-blue-400 via-indigo-500 to-blue-400 rounded-full shimmer" style={{ width: '100%' }} />
           </div>
         )}
+
+        {/* API Mode Indicator — 可点击打开配置 */}
+        <button
+          onClick={() => setShowSettings(true)}
+          className="mt-3 w-full flex items-center justify-center gap-1.5 text-[11px] text-slate-400 hover:text-blue-500 transition-colors py-1 rounded-lg hover:bg-blue-50/40"
+        >
+          <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+          {isConnected ? (
+            <span>使用 {modelName} 模型</span>
+          ) : (
+            <span className="flex items-center gap-1">
+              演示模式 · <Settings className="w-3 h-3" /> 点击配置 AI 接口
+            </span>
+          )}
+        </button>
       </div>
     </aside>
   );

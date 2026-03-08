@@ -4,6 +4,23 @@ import type { Project, Framework, User } from '../types';
 type PreviewMode = 'desktop' | 'mobile';
 type TabMode = 'preview' | 'code';
 
+// ─── 从 localStorage 读取持久化的 API 配置 ───
+function loadSetting(key: string, defaultValue: string): string {
+  try {
+    return localStorage.getItem(key) || defaultValue;
+  } catch {
+    return defaultValue;
+  }
+}
+
+function saveSetting(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // localStorage unavailable
+  }
+}
+
 interface AppState {
   user: User | null;
   projects: Project[];
@@ -20,6 +37,14 @@ interface AppState {
   showHistory: boolean;
   historyTab: 'history' | 'favorites';
 
+  // ─── 设置弹窗 ───
+  showSettings: boolean;
+
+  // ─── API 配置 ───
+  apiKey: string;
+  apiEndpoint: string;
+  modelName: string;
+
   setUser: (user: User | null) => void;
   setPrompt: (prompt: string) => void;
   setFramework: (framework: Framework) => void;
@@ -31,10 +56,19 @@ interface AppState {
   setShowHistory: (v: boolean) => void;
   setHistoryTab: (tab: 'history' | 'favorites') => void;
   setCurrentProject: (p: Project | null) => void;
+  setShowSettings: (v: boolean) => void;
+
+  // ─── API 配置 setters ───
+  setApiKey: (key: string) => void;
+  setApiEndpoint: (endpoint: string) => void;
+  setModelName: (model: string) => void;
 
   addProject: (p: Project) => void;
   toggleFavorite: (id: string) => void;
 }
+
+const DEFAULT_ENDPOINT = 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions';
+const DEFAULT_MODEL = 'qwen-vl-max';
 
 export const useStore = create<AppState>((set) => ({
   user: null,
@@ -52,6 +86,14 @@ export const useStore = create<AppState>((set) => ({
   showHistory: false,
   historyTab: 'history',
 
+  // ─── 设置弹窗 ───
+  showSettings: false,
+
+  // ─── API 配置（从 localStorage 恢复） ───
+  apiKey: loadSetting('pm_api_key', ''),
+  apiEndpoint: loadSetting('pm_api_endpoint', DEFAULT_ENDPOINT),
+  modelName: loadSetting('pm_model_name', DEFAULT_MODEL),
+
   setUser: (user) => set({ user }),
   setPrompt: (prompt) => set({ prompt }),
   setFramework: (framework) => set({ framework }),
@@ -63,6 +105,21 @@ export const useStore = create<AppState>((set) => ({
   setShowHistory: (showHistory) => set({ showHistory }),
   setHistoryTab: (historyTab) => set({ historyTab }),
   setCurrentProject: (currentProject) => set({ currentProject }),
+  setShowSettings: (showSettings) => set({ showSettings }),
+
+  // ─── API 配置 setters（同时持久化到 localStorage）───
+  setApiKey: (apiKey) => {
+    saveSetting('pm_api_key', apiKey);
+    set({ apiKey });
+  },
+  setApiEndpoint: (apiEndpoint) => {
+    saveSetting('pm_api_endpoint', apiEndpoint);
+    set({ apiEndpoint });
+  },
+  setModelName: (modelName) => {
+    saveSetting('pm_model_name', modelName);
+    set({ modelName });
+  },
 
   addProject: (p) => set((s) => ({ projects: [p, ...s.projects], currentProject: p })),
   toggleFavorite: (id) =>

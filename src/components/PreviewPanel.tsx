@@ -1,11 +1,11 @@
 import { useState, useMemo, useCallback } from 'react';
 import {
   Monitor, Smartphone, RefreshCw, Star, Download, Copy, Check,
-  Eye, Code2, Sparkles, Loader2
+  Eye, Code2, Sparkles, Loader2, Settings, ExternalLink, Key, ArrowRight
 } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { frameworkLabels } from '../types';
-import { generateCode } from '../utils/mockAI';
+import { frameworkLabels, type Project } from '../types';
+import { generateCode } from '../utils/api';
 
 export default function PreviewPanel() {
   const {
@@ -17,6 +17,8 @@ export default function PreviewPanel() {
     prompt, framework, imageUrl,
     setIsGenerating, setStreamingCode, addProject,
     toggleFavorite,
+    apiKey, apiEndpoint, modelName,
+    setShowSettings,
   } = useStore();
 
   const [copied, setCopied] = useState(false);
@@ -39,10 +41,19 @@ export default function PreviewPanel() {
     setStreamingCode('');
     setTabMode('preview');
     try {
-      const code = await generateCode(prompt, framework, imageUrl || undefined, (partial) => {
-        setStreamingCode(partial);
+      const code = await generateCode({
+        prompt,
+        framework,
+        imageUrl: imageUrl || undefined,
+        apiKey,
+        apiEndpoint,
+        modelName,
+        onProgress: (partial) => {
+          setStreamingCode(partial);
+        },
       });
-      addProject({
+
+      const project: Project = {
         id: Date.now().toString(),
         userId: 'demo-user',
         imageUrl,
@@ -51,7 +62,10 @@ export default function PreviewPanel() {
         generatedCode: code,
         isFavorite: false,
         createTime: Date.now(),
-      });
+      };
+      addProject(project);
+    } catch (err) {
+      console.error('Regenerate error:', err);
     } finally {
       setIsGenerating(false);
     }
@@ -70,38 +84,135 @@ export default function PreviewPanel() {
     URL.revokeObjectURL(url);
   };
 
-  // Empty state
+  const isConnected = apiKey.trim().length > 0;
+
+  // ═══════════════════════════════════════════
+  // 空状态 — 带醒目的 API 配置引导
+  // ═══════════════════════════════════════════
   if (!displayCode && !isGenerating) {
     return (
       <main className="flex-1 flex items-center justify-center relative z-10">
-        <div className="text-center max-w-md px-8">
+        <div className="text-center max-w-lg px-8">
+          {/* Main Icon */}
           <div className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-blue-100/80 to-indigo-100/80 flex items-center justify-center shadow-lg shadow-blue-200/20">
             <Sparkles className="w-12 h-12 text-blue-400" />
           </div>
           <h3 className="text-xl font-bold text-slate-700 mb-3">开始创作你的 UI</h3>
-          <p className="text-sm text-slate-400 leading-relaxed mb-6">
+          <p className="text-sm text-slate-400 leading-relaxed mb-8">
             在左侧上传参考图片，描述你想要的界面效果，
             <br />AI 将为你自动生成高质量的前端代码
           </p>
-          <div className="flex items-center justify-center gap-6 text-xs text-slate-400">
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-emerald-400" />
-              智能识图
+
+          {/* ⭐ 配置状态卡片 — 最关键的入口 */}
+          {!isConnected ? (
+            <div className="mx-auto max-w-md">
+              {/* 大配置引导卡 */}
+              <button
+                onClick={() => setShowSettings(true)}
+                className="w-full group p-6 rounded-2xl bg-gradient-to-br from-blue-50/80 via-white/60 to-indigo-50/80 border-2 border-blue-200/50 hover:border-blue-300/70 transition-all hover:shadow-xl hover:shadow-blue-500/10 hover:-translate-y-1 text-left cursor-pointer"
+              >
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/25 group-hover:scale-110 transition-transform">
+                    <Key className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="text-base font-bold text-slate-800">配置 AI 接口</h4>
+                      <span className="flex h-2.5 w-2.5">
+                        <span className="animate-ping absolute inline-flex h-2.5 w-2.5 rounded-full bg-blue-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500" />
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-500 leading-relaxed mb-3">
+                      接入阿里云通义千问 Qwen-VL 大模型，开启真实 AI 生成能力
+                    </p>
+                    <div className="flex items-center gap-2 text-blue-600 text-sm font-semibold group-hover:gap-3 transition-all">
+                      <Settings className="w-4 h-4" />
+                      点击打开配置面板
+                      <ArrowRight className="w-4 h-4" />
+                    </div>
+                  </div>
+                </div>
+              </button>
+
+              {/* 配置步骤快速预览 */}
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                <div className="p-3 rounded-xl bg-white/40 backdrop-blur-sm border border-white/50 text-center">
+                  <div className="text-lg mb-1">🔑</div>
+                  <p className="text-[10px] text-slate-500 font-medium">第一步</p>
+                  <p className="text-[10px] text-slate-400">获取 API Key</p>
+                </div>
+                <div className="p-3 rounded-xl bg-white/40 backdrop-blur-sm border border-white/50 text-center">
+                  <div className="text-lg mb-1">🌐</div>
+                  <p className="text-[10px] text-slate-500 font-medium">第二步</p>
+                  <p className="text-[10px] text-slate-400">选择 API 端点</p>
+                </div>
+                <div className="p-3 rounded-xl bg-white/40 backdrop-blur-sm border border-white/50 text-center">
+                  <div className="text-lg mb-1">🧠</div>
+                  <p className="text-[10px] text-slate-500 font-medium">第三步</p>
+                  <p className="text-[10px] text-slate-400">选择模型</p>
+                </div>
+              </div>
+
+              {/* 演示模式提示 */}
+              <p className="mt-5 text-xs text-slate-400 leading-relaxed">
+                💡 未配置时也可使用 — 将以<span className="text-amber-500 font-medium">内置模板演示模式</span>运行，
+                在左侧输入需求即可体验
+              </p>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-blue-400" />
-              实时预览
+          ) : (
+            <div className="space-y-4">
+              {/* 已连接状态 */}
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-50/60 border border-emerald-200/50">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-sm text-emerald-700 font-medium">AI 已连接 · {useStore.getState().modelName}</span>
+                <button
+                  onClick={() => setShowSettings(true)}
+                  className="ml-2 text-emerald-600 hover:text-emerald-800 transition"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-center gap-6 text-xs text-slate-400">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                  智能识图
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-blue-400" />
+                  实时预览
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-violet-400" />
+                  多框架导出
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-violet-400" />
-              多框架导出
+          )}
+
+          {/* 阿里云百炼平台链接 */}
+          {!isConnected && (
+            <div className="mt-6 pt-5 border-t border-blue-100/40">
+              <a
+                href="https://bailian.console.aliyun.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-blue-500 hover:text-blue-700 hover:underline transition"
+              >
+                <ExternalLink className="w-3 h-3" />
+                前往阿里云百炼平台获取 API Key（新用户赠送百万 Token）
+              </a>
             </div>
-          </div>
+          )}
         </div>
       </main>
     );
   }
 
+  // ═══════════════════════════════════════════
+  // 有内容时的正常预览
+  // ═══════════════════════════════════════════
   return (
     <main className="flex-1 flex flex-col min-w-0 relative z-10">
       {/* Action Bar */}
