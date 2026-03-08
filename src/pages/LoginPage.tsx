@@ -160,116 +160,118 @@ export default function LoginPage() {
                   </p>
                 </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1.5">用户名</label>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => { setUsername(e.target.value); setError(''); }}
-                  onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                  placeholder="输入用户名"
-                  className="glass-input w-full"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1.5">密码</label>
-                <div className="relative">
-                  <input
-                    type={showPwd ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
-                    placeholder="输入密码"
-                    className="glass-input w-full pr-10"
-                  />
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600 mb-1.5">用户名</label>
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => { setUsername(e.target.value); setError(''); }}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
+                      placeholder="输入用户名"
+                      className="glass-input w-full"
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600 mb-1.5">密码</label>
+                    <div className="relative">
+                      <input
+                        type={showPwd ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
+                        placeholder="输入密码"
+                        className="glass-input w-full pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPwd(!showPwd)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
+                      >
+                        {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {isRegisterMode && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-600 mb-1.5">确认密码</label>
+                      <input
+                        type={showPwd ? 'text' : 'password'}
+                        value={confirmPassword}
+                        onChange={(e) => { setConfirmPassword(e.target.value); setError(''); }}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
+                        placeholder="再次输入密码"
+                        className="glass-input w-full"
+                      />
+                    </div>
+                  )}
+
+                  {error && (
+                    <div className="text-sm text-red-500 bg-red-50/60 border border-red-200/40 px-3 py-2 rounded-xl">
+                      {error}
+                    </div>
+                  )}
+
                   <button
-                    type="button"
-                    onClick={() => setShowPwd(!showPwd)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
+                    onClick={handleAuth}
+                    disabled={loading}
+                    className="btn-primary w-full flex items-center justify-center gap-2 mt-2"
                   >
-                    {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {isRegisterMode && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-600 mb-1.5">确认密码</label>
-                  <input
-                    type={showPwd ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(e) => { setConfirmPassword(e.target.value); setError(''); }}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
-                    placeholder="再次输入密码"
-                    className="glass-input w-full"
-                  />
-                </div>
-              )}
-
-              {error && (
-                <div className="text-sm text-red-500 bg-red-50/60 border border-red-200/40 px-3 py-2 rounded-xl">
-                  {error}
-                </div>
-              )}
-
-              <button
-                onClick={handleAuth}
-                disabled={loading}
-                className="btn-primary w-full flex items-center justify-center gap-2 mt-2"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    {isRegisterMode ? '注册中...' : '登录中...'}
-                  </>
-                ) : (
-                  <>
-                    {isRegisterMode ? (
+                    {loading ? (
                       <>
-                        <UserPlus className="w-4 h-4" />
-                        注册账户
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        {isRegisterMode ? '注册中...' : '登录中...'}
                       </>
                     ) : (
                       <>
-                        <LogIn className="w-4 h-4" />
-                        登录
+                        {isRegisterMode ? (
+                          <>
+                            <UserPlus className="w-4 h-4" />
+                            注册账户
+                          </>
+                        ) : (
+                          <>
+                            <LogIn className="w-4 h-4" />
+                            登录
+                          </>
+                        )}
                       </>
                     )}
-                  </>
-                )}
-              </button>
+                  </button>
 
-              <div className="flex items-center justify-center gap-4 mt-4">
-                <button
-                  onClick={() => {
-                    setIsRegisterMode(false);
-                    setError('');
-                    setConfirmPassword('');
-                  }}
-                  className={`text-xs transition ${!isRegisterMode ? 'text-blue-600 font-medium' : 'text-slate-400 hover:text-slate-600'}`}
-                >
-                  登录
-                </button>
-                <span className="text-slate-300">|</span>
-                <button
-                  onClick={() => {
-                    setIsRegisterMode(true);
-                    setError('');
-                    setConfirmPassword('');
-                  }}
-                  className={`text-xs transition ${isRegisterMode ? 'text-blue-600 font-medium' : 'text-slate-400 hover:text-slate-600'}`}
-                >
-                  注册
-                </button>
-              </div>
+                  <div className="flex items-center justify-center gap-4 mt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRegisterMode(false);
+                        setError('');
+                        setConfirmPassword('');
+                      }}
+                      className={`text-xs transition ${!isRegisterMode ? 'text-blue-600 font-medium' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                      登录
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsRegisterMode(true);
+                        setError('');
+                        setConfirmPassword('');
+                      }}
+                      className={`text-xs transition ${isRegisterMode ? 'text-blue-600 font-medium' : 'text-slate-400 hover:text-slate-600'}`}
+                    >
+                      注册
+                    </button>
+                  </div>
 
-              <p className="text-center text-xs text-slate-400 mt-2">
-                演示版本 · 数据本地存储，支持自动同步
-              </p>
-            </>
-          )}
+                  <p className="text-center text-xs text-slate-400 mt-2">
+                    演示版本 · 数据本地存储，支持自动同步
+                  </p>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
